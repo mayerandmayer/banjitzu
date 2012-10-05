@@ -1,0 +1,58 @@
+<!doctype html>
+<html ng-app>
+  <head>
+    <script src="angular.min.js"></script>
+    <script>
+      function Sequence($scope) {
+        $scope.sequence = [];
+        for (var i = 0; i < 60; i += 1) {
+          var instant = [];
+          for (var j = 0; j < 32; j += 1) {
+            var pitch = { playPitch : false, style : { 'background-color' : '#aaaaaa' } };
+            instant[j] = pitch;
+          }
+          $scope.sequence[i] = instant;
+        }
+      }
+      
+      function Note($scope) {
+      
+        $scope.toggle = function() {
+          $scope.pitch.playPitch = !$scope.pitch.playPitch;
+          if ($scope.pitch.playPitch) {
+            $scope.pitch.style = { 'background-color' : '#444444' };
+          } else {
+            $scope.pitch.style = { 'background-color' : '#aaaaaa' };
+          }
+        }
+      }
+      
+    </script>
+    <style>
+      table {
+        border-spacing: 0px;
+      }
+    
+      .note {
+        width:8px;
+        height:6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div ng-controller="Sequence">
+      <table>
+        <tr ng-repeat="instant in sequence">
+          <td ng-repeat="pitch in instant">
+            <div ng-controller="Note" 
+              class="note" 
+              ng-click="toggle()" 
+              ng-mouseenter="toggle()"
+              ng-mouseleave="toggle()"
+              ng-style="pitch.style" />
+          </td>
+        </tr>
+      </table>
+    </div>
+   </body>
+ </html>
