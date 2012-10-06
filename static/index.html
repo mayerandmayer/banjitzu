@@ -2,29 +2,117 @@
 <html ng-app>
   <head>
     <script src="angular.min.js"></script>
+    <script src="riffwave.js"></script>
     <script>
-      function Sequence($scope) {
-        $scope.sequence = [];
-        for (var i = 0; i < 60; i += 1) {
-          var instant = [];
-          for (var j = 0; j < 32; j += 1) {
-            var pitch = { playPitch : false, style : { 'background-color' : '#aaaaaa' } };
-            instant[j] = pitch;
+      // Controller for the whole sequence editor
+      
+      function doToggle(notecell) {
+        notecell.playPitch = !notecell.playPitch;
+          if (notecell.playPitch) {
+            notecell.style = { 'background-color' : 'coral' };
+          } else {
+            notecell.style = { 'background-color' : 'cadetblue' };
           }
-          $scope.sequence[i] = instant;
-        }
       }
       
-      function Note($scope) {
+      var numPitches = 8;
+      var numTimeSlices = 32;
+      var numChannels = 2;
       
-        $scope.toggle = function() {
-          $scope.pitch.playPitch = !$scope.pitch.playPitch;
-          if ($scope.pitch.playPitch) {
-            $scope.pitch.style = { 'background-color' : '#444444' };
-          } else {
-            $scope.pitch.style = { 'background-color' : '#aaaaaa' };
+      var bpm = 120;
+      var sampleRate = 44056; // Hz
+      
+      var samplesPerSlice = sampleRate * 60 /* seconds per minute */ * (1/bpm) * (1/4) /* timeslices per beat */
+      
+      // We're going to hard code 120 bpm for now. This gives us 2 seconds of audio, or 
+      
+      function SequenceEditor($scope) {
+        
+        $scope.sequence = [];
+        for (var i = 0; i < numPitches; i += 1) {
+          var pitch = [];
+          for (var j = 0; j < numTimeSlices; j += 1) {
+            var notecell = { playPitch : false, style : { 'background-color' : 'cadetblue' } };
+            pitch[j] = notecell;
           }
+          $scope.sequence[i] = pitch;
         }
+        
+        var play = function() {
+          
+          //alert("Playing sequence with " + samplesPerSlice + " samples per slice");
+          
+          var pitchData = []
+          
+          for (var pitch = 0; pitch < numPitches; pitch += 1) {
+            
+            var pitchMod = 50 * Math.pow(2,(pitch / 12))
+            
+            var data = [];
+            var totalSamples = samplesPerSlice * numTimeSlices;
+            for (var i = 0; i < totalSamples; i += 1) {
+            
+              var timeSlice = Math.floor(i / samplesPerSlice);
+              var notecell = ($scope.sequence[pitch][timeSlice])
+              var onOffMultiplier = notecell.playPitch ? 1 : 0;
+              //var onOffMultiplier = 1;
+            
+              data[2*i    ] = 128 + onOffMultiplier * Math.round(127*Math.sin(i/pitchMod));
+              data[2*i + 1] = 128 + onOffMultiplier * Math.round(127*Math.sin(i/pitchMod));
+            }
+            
+            pitchData[pitch] = data;
+            
+          }
+          
+          totalData = [];
+          
+          for (var i = 0; i < numChannels * totalSamples; i += 1) {
+            var sum = 0
+            var notesOn = 0
+            for (var pitch = 0; pitch < numPitches; pitch += 1) {
+              
+              var timeSlice = Math.floor(i / (2 * samplesPerSlice));
+              var notecell = ($scope.sequence[pitch][timeSlice])
+              var onOffMultiplier = notecell.playPitch ? 1 : 0;
+              
+              if (notecell.playPitch) {
+                var sample = pitchData[pitch][i]
+                sum += sample;
+                notesOn += 1;
+              }
+              
+            }
+            totalData[i] = sum / notesOn;
+          }
+          
+          var audio = new Audio();
+          var wave = new RIFFWAVE();
+          wave.header.sampleRate = sampleRate;
+          wave.header.numChannels = numChannels;
+          wave.Make(totalData);
+          audio.src = wave.dataURI;
+          audio.play();
+          
+        }
+        
+        var task;
+        
+        $scope.start = function() {
+          task = setInterval(play, 4000)
+        }
+        
+        $scope.stop = function() {
+          clearInterval(task)
+        }
+        
+      }
+      
+      // Controller for an individual note cell
+      function NoteCell($scope) {
+      
+        $scope.toggle = function(){doToggle($scope.notecell)}
+        
       }
       
     </script>
@@ -40,16 +128,18 @@
     </style>
   </head>
   <body>
-    <div ng-controller="Sequence">
+    <div ng-controller="SequenceEditor">
+      <button ng-click="start()">Start</button>
+      <button ng-click="stop()">Stop</button>
       <table>
-        <tr ng-repeat="instant in sequence">
-          <td ng-repeat="pitch in instant">
-            <div ng-controller="Note" 
+        <!-- a pitch is a row of note cells -->
+        <tr ng-repeat="pitch in sequence">
+          <!-- a note cell is the actual button -->
+          <td ng-repeat="notecell in pitch">
+            <div ng-controller="NoteCell" 
               class="note" 
               ng-click="toggle()" 
-              ng-mouseenter="toggle()"
-              ng-mouseleave="toggle()"
-              ng-style="pitch.style" />
+              ng-style="notecell.style" />
           </td>
         </tr>
       </table>
