@@ -15,7 +15,11 @@
           }
       }
       
-      var numPitches = 8;
+      function attack(x) {
+        return 1 - Math.pow((2 * x - 1),6);
+      }
+      
+      var numPitches = 13;
       var numTimeSlices = 32;
       var numChannels = 2;
       
@@ -56,9 +60,11 @@
               var notecell = ($scope.sequence[pitch][timeSlice])
               var onOffMultiplier = notecell.playPitch ? 1 : 0;
               //var onOffMultiplier = 1;
-            
-              data[2*i    ] = 128 + onOffMultiplier * Math.round(127*Math.sin(i/pitchMod));
-              data[2*i + 1] = 128 + onOffMultiplier * Math.round(127*Math.sin(i/pitchMod));
+              
+              var attackMultiplier = attack((i / samplesPerSlice) % 1)
+              
+              data[2*i    ] = 128 + onOffMultiplier * attackMultiplier * Math.round(127*Math.sin(i/pitchMod));
+              data[2*i + 1] = 128 + onOffMultiplier * attackMultiplier * Math.round(127*Math.sin(i/pitchMod));
             }
             
             pitchData[pitch] = data;
@@ -83,7 +89,7 @@
               }
               
             }
-            totalData[i] = sum / notesOn;
+            totalData[i] = (notesOn == 0) ? 128 : sum / notesOn;
           }
           
           var audio = new Audio();
