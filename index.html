@@ -5,15 +5,14 @@
     <script src="riffwave.js"></script>
     <script type="text/javascript"
             src="http://www.parsecdn.com/js/parse-1.1.5.min.js"></script>
-    <script src="parsestuff.js"></script>
-    <script src="audiostuff.js"></script>
+    <script src="controllers.js"></script>
+    <link rel="stylesheet" type="text/css" href="bootstrap.css" />
     <style type="text/css">
       table {
           border-spacing: 0px;
       }
-      
       .note {
-          width:8px;
+          width:10px;
           height:6px;
       }
     </style>
@@ -33,30 +32,45 @@
         <button ng-click="login()">Login</button>
       </div>
     </div>
-    <div ng-controller="SequenceEditor"
+    
+    <div id="UIMain"
          ng-show="currentUser">
       
-      <div>
-        <h4>Hello {{ currentUser.attributes.username }}</h4>
-        <button ng-click="logout()">Logout</button>
+      <div class="row">
+        <div class="span10 offset1">
+          <h4>Hello {{ currentUser.attributes.username }}</h4>
+          <button ng-click="logout()">Logout</button>
+        </div>
       </div>
       
-      <button ng-disabled="task" ng-click="start()">Start</button>
-      <button ng-disabled="!task" ng-click="stop()">Stop</button>
-      
-      <table>
-        <!-- a pitch is a row of note cells -->
-        <tr ng-repeat="pitch in sequence">
-          <!-- a note cell is the actual button -->
-          <td ng-repeat="notecell in pitch">
-            <div ng-controller="NoteCell" 
-                 class="note" 
-                 ng-click="toggle()" 
-                 ng-style="notecell.style" />
-          </td>
-        </tr>
-      </table>
-      
+      <div class="row">
+        
+        <div ng-controller="Library"
+             class="span4">
+          <h3>Sequences</h3>
+        </div>
+        
+        <div ng-controller="SequenceEditor"
+             class="span8">
+          
+          <button ng-disabled="task" ng-click="start()">Start</button>
+          <button ng-disabled="!task" ng-click="stop()">Stop</button>
+          
+          <table>
+            <!-- a pitch is a row of note cells -->
+            <tr ng-repeat="pitch in sequence">
+              <!-- a note cell is the actual button -->
+              <td ng-repeat="notecell in pitch">
+                <div ng-controller="NoteCell" 
+                     class="note" 
+                     ng-click="toggle()" 
+                     ng-style="notecell.style" />
+              </td>
+            </tr>
+          </table>
+          
+        </div>
+      </div>
     </div>
   </body>
 </html>
