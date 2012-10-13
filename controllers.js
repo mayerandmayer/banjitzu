@@ -1,44 +1,9 @@
 // Setup Parse
 Parse.initialize("0vkAZmA6fG72LcEdrdhSFSGwak929wuNg7pYUnS3", "ajpyz4W4mSH1xqUqMuz8fZfuEwgtER9Aj7jSC8k1");
 
-function Authentication($scope) {
-    $scope.register = function() {
-        
-        var user = new Parse.User();
-        user.set("username", $scope.register.username);
-        user.set("password", $scope.register.password);
-        user.set("email",    $scope.register.email);
-        
-        user.signUp(null, {
-            success: function(user) {
-                $scope.$apply(function() {
-                    $scope.updateUser();
-                });
-            },
-            error: function(user,error) {
-                alert ("Error: " + error.code + " " + error.message);
-            }
-        });
-        
-    }
-    
-    $scope.login = function() {
-        
-        Parse.User.logIn($scope.login.username, $scope.login.password, {
-            success: function(user) {
-                $scope.$apply(function() {
-                    $scope.updateUser();
-                });
-            },
-            error: function(user, error) {
-                alert("Error: " + error.code + " " + error.message);
-            }
-        });
-        
-    }
-}
+var Sequence = Parse.Object.extend("Sequence");
 
-function Global($scope) {
+function ParseGlobal($scope) {
     
     $scope.currentUser = Parse.User.current();
     
@@ -53,38 +18,102 @@ function Global($scope) {
     
 }
 
-function Library($scope) {
-    
-    
-    
-    
+function onError(error) {
+    alert ("Error: " + error.code + " " + error.message);
 }
 
-// Controller for the whole sequence editor      
-function SequenceEditor($scope) {
+function Authentication($scope) {
     
-    function attack(x) {
-        return 1 - Math.pow((2 * x - 1),6);
+    $scope.register = function() {
+        
+        var user = new Parse.User();
+        user.set("username", $scope.register.username);
+        user.set("password", $scope.register.password);
+        user.set("email",    $scope.register.email);
+        
+        user.signUp(null, {
+            success: function(user) {
+                $scope.$apply(function() {
+                    $scope.updateUser();
+                });
+            },
+            error: function(user,error) {
+                onError(error);
+            }
+        });
+        
     }
     
+    $scope.login = function() {
+        
+        Parse.User.logIn($scope.login.username, $scope.login.password, {
+            success: function(user) {
+                $scope.$apply(function() {
+                    $scope.updateUser();
+                });
+            },
+            error: function(user, error) {
+                onError(error);
+            }
+        });
+        
+    }
+}
+
+function Editor($scope) {
+    
+    /* Shared data for the Sequence Editor */
+
+    // Constants
     var numPitches = 13;
     var numTimeSlices = 32;
     var numChannels = 2;
+    
+    // The blank sequence
+    var blankData = [];
+    for (var i = 0; i < numPitches; i += 1) {
+        var pitch = [];
+        for (var j = 0; j < numTimeSlices; j += 1) {
+            pitch[j] = false;
+        }
+        blankData[i] = pitch;
+    }
+    
+    $scope.currentSequence = {}
+    
+    $scope.openSequence = function(name, data) {
+        
+        var editData = _.map(data, function(pitch) {
+            return _.map(pitch, function(playPitch) {            
+                return {
+                    playPitch: playPitch,
+                };
+            });
+        });
+        
+        $scope.currentSequence.name = name;
+        $scope.currentSequence.editData = editData;
+        
+    }
+    
+    $scope.extractData = function() {
+        return _.map($scope.currentSequence.editData, function(pitch) {
+            return _.map(pitch, function(notecell) {
+                return notecell.playPitch;
+            });
+        });
+    }
+    
+    $scope.openSequence("Untitled", blankData);
+    function attack(x) {
+        return 1 - Math.pow((2 * x - 1),6);
+    }
     
     var bpm = 120;
     var sampleRate = 44056; // Hz
     
     var samplesPerSlice = sampleRate * 60 /* seconds per minute */ * (1/bpm) * (1/4)
     
-    $scope.sequence = [];
-    for (var i = 0; i < numPitches; i += 1) {
-        var pitch = [];
-        for (var j = 0; j < numTimeSlices; j += 1) {
-            var notecell = { playPitch : false, style : { 'background-color' : 'cadetblue' } };
-            pitch[j] = notecell;
-        }
-        $scope.sequence[i] = pitch;
-    }
     
     var play = function() {
         
@@ -101,7 +130,7 @@ function SequenceEditor($scope) {
             for (var i = 0; i < totalSamples; i += 1) {
                 
                 var timeSlice = Math.floor(i / samplesPerSlice);
-                var notecell = ($scope.sequence[pitch][timeSlice])
+                var notecell = ($scope.currentSequence.editData[pitch][timeSlice])
                 var onOffMultiplier = notecell.playPitch ? 1 : 0;
                 //var onOffMultiplier = 1;
                 
@@ -123,7 +152,7 @@ function SequenceEditor($scope) {
             for (var pitch = 0; pitch < numPitches; pitch += 1) {
                 
                 var timeSlice = Math.floor(i / (2 * samplesPerSlice));
-                var notecell = ($scope.sequence[pitch][timeSlice])
+                var notecell = ($scope.currentSequence.editData[pitch][timeSlice])
                 var onOffMultiplier = notecell.playPitch ? 1 : 0;
                 
                 if (notecell.playPitch) {
@@ -157,20 +186,81 @@ function SequenceEditor($scope) {
         $scope.task = clearInterval($scope.task)
     }
     
+    $scope.saveAsNew = function() {
+        
+        var sequence = new Sequence();
+        sequence.set("data", $scope.extractData());
+        sequence.set("name", $scope.newSequence.name);
+        sequence.set("owner", $scope.currentUser);
+        
+        var sequenceACL = new Parse.ACL();
+        sequenceACL.setPublicReadAccess(true);
+        sequenceACL.setWriteAccess($scope.currentUser, true);
+        
+        sequence.setACL(sequenceACL);
+        
+        sequence.save(null, {
+            success: function(sequence) {
+                alert("Good");
+            },
+            error: function(sequence, error) {
+                onError(error);
+            }
+        });
+        
+    }
+    
+    /* Shared data for the Library */
+
+    
+    $scope.viewingUser = $scope.currentUser;
+    $scope.sequences = [];
+    
+    $scope.loadUserSequences = function(user) {
+        
+        var query = new Parse.Query(Sequence);
+        query.equalTo("owner", user);
+        query.find({
+            success: function(userSequences) {
+                $scope.$apply(function() {
+                    $scope.sequences = userSequences;
+                });
+            },
+            error: function(userSequences, error) {
+                onError(error);
+            }
+        });
+        
+    }
+    
+    $scope.loadUserSequences($scope.viewingUser);
+    
+    
+}
+
+function LibrarySequence($scope) {
+    
+    $scope.load = function() {
+        
+        $scope.openSequence($scope.sequence.attributes.name, 
+                            $scope.sequence.attributes.data);
+        
+    }
+    
 }
 
 // Controller for an individual note cell
 function NoteCell($scope) {
-    // Some utility stuff
-    function doToggle(notecell) {
-        notecell.playPitch = !notecell.playPitch;
-        if (notecell.playPitch) {
-            notecell.style = { 'background-color' : 'coral' };
-        } else {
-            notecell.style = { 'background-color' : 'cadetblue' };
-        }
+
+    $scope.setClass = function() {
+        $scope.playClass = $scope.notecell.playPitch ? 'play' : 'noPlay';
     }
     
-    $scope.toggle = function(){doToggle($scope.notecell)}
+    $scope.toggle = function() {
+        $scope.notecell.playPitch = !$scope.notecell.playPitch;
+        $scope.setClass();
+    }
+    
+    $scope.setClass();
     
 }

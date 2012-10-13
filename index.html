@@ -3,6 +3,7 @@
   <head>
     <script src="angular.min.js"></script>
     <script src="riffwave.js"></script>
+    <script src="underscore.js"></script>
     <script type="text/javascript"
             src="http://www.parsecdn.com/js/parse-1.1.5.min.js"></script>
     <script src="controllers.js"></script>
@@ -15,9 +16,16 @@
           width:10px;
           height:6px;
       }
+      .noPlay {
+          background-color:cadetblue;
+      }
+      .play {
+          background-color:coral;
+      }
     </style>
   </head>
-  <body ng-controller="Global">
+  <body ng-controller="ParseGlobal">
+    <h1>BANJITZU</h1>
     <div ng-controller="Authentication"
          ng-show="!currentUser">
       <div>
@@ -33,11 +41,11 @@
       </div>
     </div>
     
-    <div id="UIMain"
+    <div ng-controller="Editor"
          ng-show="currentUser">
       
       <div class="row">
-        <div class="span10 offset1">
+        <div class="span3 offset9">
           <h4>Hello {{ currentUser.attributes.username }}</h4>
           <button ng-click="logout()">Logout</button>
         </div>
@@ -45,24 +53,37 @@
       
       <div class="row">
         
-        <div ng-controller="Library"
-             class="span4">
+        <div class="span4">
           <h3>Sequences</h3>
+          <ul>
+            <li ng-repeat="sequence in sequences">
+              <a ng-controller="LibrarySequence"
+                 ng-click="load()">
+                {{ sequence.attributes.name }}
+              </a>
+            </li>
+          </ul>
         </div>
         
-        <div ng-controller="SequenceEditor"
-             class="span8">
+        <div class="span8">
+          
+          <h4>{{openSequence.name}}</h4>
           
           <button ng-disabled="task" ng-click="start()">Start</button>
           <button ng-disabled="!task" ng-click="stop()">Stop</button>
+          <button ng-click="saveAsNew()">Save As New</button>
+          <input type="text" 
+                 class="input-small"
+                 ng-model="newSequence.name" />
           
           <table>
             <!-- a pitch is a row of note cells -->
-            <tr ng-repeat="pitch in sequence">
+            <tr ng-repeat="pitch in currentSequence.editData">
               <!-- a note cell is the actual button -->
               <td ng-repeat="notecell in pitch">
                 <div ng-controller="NoteCell" 
-                     class="note" 
+                     class="note"
+                     ng-class="playClass" 
                      ng-click="toggle()" 
                      ng-style="notecell.style" />
               </td>
