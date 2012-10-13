@@ -1,0 +1,238 @@
+<!doctype html>
+<html ng-app>
+  <head>
+    <script src="angular.min.js"></script>
+    <script src="riffwave.js"></script>
+    <script type="text/javascript"
+            src="http://www.parsecdn.com/js/parse-1.1.5.min.js"></script>
+    <script type="text/javascript">
+      
+      // Setup Parse
+      Parse.initialize("0vkAZmA6fG72LcEdrdhSFSGwak929wuNg7pYUnS3", "ajpyz4W4mSH1xqUqMuz8fZfuEwgtER9Aj7jSC8k1");
+      
+      // Some utility stuff
+      function doToggle(notecell) {
+          notecell.playPitch = !notecell.playPitch;
+          if (notecell.playPitch) {
+              notecell.style = { 'background-color' : 'coral' };
+          } else {
+              notecell.style = { 'background-color' : 'cadetblue' };
+          }
+      }
+      
+      function attack(x) {
+          return 1 - Math.pow((2 * x - 1),6);
+      }
+      
+      var numPitches = 13;
+      var numTimeSlices = 32;
+      var numChannels = 2;
+      
+      var bpm = 120;
+      var sampleRate = 44056; // Hz
+      
+      var samplesPerSlice = sampleRate * 60 /* seconds per minute */ * (1/bpm) * (1/4) /* timeslices per beat */
+      // We're going to hard code 120 bpm for now. This gives us 2
+      // seconds of audio, or 
+
+
+
+
+      // Controller for the whole sequence editor      
+      function SequenceEditor($scope) {
+          
+          $scope.sequence = [];
+          for (var i = 0; i < numPitches; i += 1) {
+              var pitch = [];
+              for (var j = 0; j < numTimeSlices; j += 1) {
+                  var notecell = { playPitch : false, style : { 'background-color' : 'cadetblue' } };
+                  pitch[j] = notecell;
+              }
+              $scope.sequence[i] = pitch;
+          }
+          
+          var play = function() {
+              
+              //alert("Playing sequence with " + samplesPerSlice + " samples per slice");
+              
+              var pitchData = []
+              
+              for (var pitch = 0; pitch < numPitches; pitch += 1) {
+                  
+                  var pitchMod = 50 * Math.pow(2,(pitch / 12))
+                  
+                  var data = [];
+                  var totalSamples = samplesPerSlice * numTimeSlices;
+                  for (var i = 0; i < totalSamples; i += 1) {
+                      
+                      var timeSlice = Math.floor(i / samplesPerSlice);
+                      var notecell = ($scope.sequence[pitch][timeSlice])
+                      var onOffMultiplier = notecell.playPitch ? 1 : 0;
+                      //var onOffMultiplier = 1;
+                      
+                      var attackMultiplier = attack((i / samplesPerSlice) % 1)
+                      
+                      data[2*i    ] = 128 + onOffMultiplier * attackMultiplier * Math.round(127*Math.sin(i/pitchMod));
+                      data[2*i + 1] = 128 + onOffMultiplier * attackMultiplier * Math.round(127*Math.sin(i/pitchMod));
+                  }
+                  
+                  pitchData[pitch] = data;
+                  
+              }
+              
+              totalData = [];
+              
+              for (var i = 0; i < numChannels * totalSamples; i += 1) {
+                  var sum = 0
+                  var notesOn = 0
+                  for (var pitch = 0; pitch < numPitches; pitch += 1) {
+                      
+                      var timeSlice = Math.floor(i / (2 * samplesPerSlice));
+                      var notecell = ($scope.sequence[pitch][timeSlice])
+                      var onOffMultiplier = notecell.playPitch ? 1 : 0;
+                      
+                      if (notecell.playPitch) {
+                          var sample = pitchData[pitch][i]
+                          sum += sample;
+                          notesOn += 1;
+                      }
+                      
+                  }
+                  totalData[i] = (notesOn == 0) ? 128 : sum / notesOn;
+              }
+              
+              var audio = new Audio();
+              var wave = new RIFFWAVE();
+              wave.header.sampleRate = sampleRate;
+              wave.header.numChannels = numChannels;
+              wave.Make(totalData);
+              audio.src = wave.dataURI;
+              audio.play();
+              
+          }
+          
+          var task;
+          
+          $scope.start = function() {
+              task = setInterval(play, 4000)
+          }
+          
+          $scope.stop = function() {
+              clearInterval(task)
+          }
+          
+      }
+      
+      // Controller for an individual note cell
+      function NoteCell($scope) {
+          
+          $scope.toggle = function(){doToggle($scope.notecell)}
+          
+      }
+      
+      function Authentication($scope) {
+          $scope.register = function() {
+              
+              var user = new Parse.User();
+              user.set("username", $scope.register.username);
+              user.set("password", $scope.register.password);
+              user.set("email",    $scope.register.email);
+              
+              user.signUp(null, {
+                  success: function(user) {
+                      $scope.$apply(function() {
+                          $scope.updateUser();
+                      });
+                  },
+                  error: function(user,error) {
+                      alert ("Error: " + error.code + " " + error.message);
+                  }
+              });
+              
+          }
+          
+          $scope.login = function() {
+              
+              Parse.User.logIn($scope.login.username, $scope.login.password, {
+                  success: function(user) {
+                      $scope.$apply(function() {
+                          $scope.updateUser();
+                      });
+                  },
+                  error: function(user, error) {
+                      alert("Error: " + error.code + " " + error.message);
+                  }
+              });
+              
+          }
+      }
+      
+      function Global($scope) {
+          
+          $scope.currentUser = Parse.User.current();
+          
+          $scope.updateUser = function() {
+              $scope.currentUser = Parse.User.current();
+          }
+          
+          $scope.logout = function() {
+              Parse.User.logOut();
+              $scope.updateUser()
+          }
+
+      }
+      
+    </script>
+    <style type="text/css">
+      table {
+      border-spacing: 0px;
+      }
+      
+      .note {
+      width:8px;
+      height:6px;
+      }
+    </style>
+  </head>
+  <body ng-controller="Global">
+    <div ng-controller="Authentication"
+         ng-show="!currentUser">
+      <div>
+        <input type="text" ng-model="register.username" />
+        <input type="password" ng-model="register.password" />
+        <input type="email" ng-model="register.email" />
+        <button ng-click="register()">Register</button>
+      </div>
+      <div>
+        <input type="text" ng-model="login.username" />
+        <input type="password" ng-model="login.password" />
+        <button ng-click="login()">Login</button>
+      </div>
+    </div>
+    <div ng-controller="SequenceEditor"
+         ng-show="currentUser">
+      
+      <div>
+        <h4>Hello {{ currentUser.attributes.username }}</h4>
+        <button ng-click="logout()">Logout</button>
+      </div>
+      
+      <button ng-click="start()">Start</button>
+      <button ng-click="stop()">Stop</button>
+      
+      <table>
+        <!-- a pitch is a row of note cells -->
+        <tr ng-repeat="pitch in sequence">
+          <!-- a note cell is the actual button -->
+          <td ng-repeat="notecell in pitch">
+            <div ng-controller="NoteCell" 
+                 class="note" 
+                 ng-click="toggle()" 
+                 ng-style="notecell.style" />
+          </td>
+        </tr>
+      </table>
+      
+    </div>
+  </body>
+</html>
