@@ -12,7 +12,8 @@
       table {
           border-spacing: 0px;
       }
-      .note {
+      .noteCell {
+          margin-bottom:1px;
           width:10px;
           height:6px;
       }
@@ -22,23 +23,57 @@
       .play {
           background-color:coral;
       }
+      .timeSlice {
+          float:left;
+          margin-right:1px;
+      }
     </style>
   </head>
   <body ng-controller="ParseGlobal">
     <h1>BANJITZU</h1>
     <div ng-controller="Authentication"
-         ng-show="!currentUser">
-      <div>
-        <input type="text" ng-model="register.username" />
-        <input type="password" ng-model="register.password" />
-        <input type="email" ng-model="register.email" />
-        <button ng-click="register()">Register</button>
-      </div>
-      <div>
-        <input type="text" ng-model="login.username" />
-        <input type="password" ng-model="login.password" />
-        <button ng-click="login()">Login</button>
-      </div>
+         ng-show="!currentUser"
+         class="row">
+        <div class="span4 offset2">
+          <div>
+            <input class="input-small"  
+                   type="text"
+                   ng-model="register.username" />
+            Username
+          </div>
+          <div>
+            <input class="input-small"  
+                   type="password" 
+                   ng-model="register.password" />
+            Password
+          </div>
+          <div>
+            <input class="input-small"  
+                   type="email" 
+                   ng-model="register.email" />
+            Email
+          </div>
+          <div>
+            <button ng-click="register()">Register</button>
+          </div>
+        </div>
+        <div class="span4">
+          <div>
+            <input class="input-small"  
+                   type="text"
+                   ng-model="login.username" />
+            Username
+          </div>
+          <div>
+            <input class="input-small"  
+                   type="password"
+                   ng-model="login.password" />
+            Password
+          </div>
+          <div>
+            <button ng-click="login()">Login</button>
+          </div>
+        </div>
     </div>
     
     <div ng-controller="Editor"
@@ -67,29 +102,27 @@
         
         <div class="span8">
           
-          <h4>{{openSequence.name}}</h4>
+          <h4>{{ currentSequence.name }}</h4>
           
-          <button ng-disabled="task" ng-click="start()">Start</button>
-          <button ng-disabled="!task" ng-click="stop()">Stop</button>
-          <button ng-click="saveAsNew()">Save As New</button>
-          <input type="text" 
-                 class="input-small"
-                 ng-model="newSequence.name" />
+          <div>
+            <button ng-disabled="task" ng-click="start()">Start</button>
+            <button ng-disabled="!task" ng-click="stop()">Stop</button>
+            <button ng-click="saveAsNew()">Save As New</button>
+            <input type="text" 
+                   class="input-small"
+                   ng-model="newSequence.name" />
+          </div>
           
-          <table>
-            <!-- a pitch is a row of note cells -->
-            <tr ng-repeat="pitch in currentSequence.editData">
-              <!-- a note cell is the actual button -->
-              <td ng-repeat="notecell in pitch">
-                <div ng-controller="NoteCell" 
-                     class="note"
-                     ng-class="playClass" 
-                     ng-click="toggle()" 
-                     ng-style="notecell.style" />
-              </td>
-            </tr>
-          </table>
-          
+          <div ng-repeat="timeSlice in currentSequence.timeSlices"
+               ng-controller="TimeSlice"
+               class="timeSlice">
+            <div ng-repeat="noteCell in timeSlice.noteCells"
+                 ng-controller="NoteCell"
+                 ng-click="toggle()"
+                 ng-class="playClass"
+                 class="noteCell" />
+          </div>
+
         </div>
       </div>
     </div>

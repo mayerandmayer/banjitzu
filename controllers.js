@@ -60,116 +60,107 @@ function Authentication($scope) {
     }
 }
 
+// Constants
+var numPitches = 13;
+//var numPitches = 1;
+var numTimeSlices = 32;
+var numChannels = 2;
+var bpm = 120;
+var sampleRate = 44100; // Hz
+var samplesPerSlice = Math.floor(sampleRate * 60 * (1/bpm) * (1/4))
+
 function Editor($scope) {
     
     /* Shared data for the Sequence Editor */
-
-    // Constants
-    var numPitches = 13;
-    var numTimeSlices = 32;
-    var numChannels = 2;
     
     // The blank sequence
     var blankData = [];
-    for (var i = 0; i < numPitches; i += 1) {
-        var pitch = [];
-        for (var j = 0; j < numTimeSlices; j += 1) {
-            pitch[j] = false;
+    for (var i = 0; i < numTimeSlices; i += 1) {
+        var timeslice = [];
+        for (var j = 0; j < numPitches; j += 1) {
+            timeslice[j] = false;
         }
-        blankData[i] = pitch;
+        blankData[i] = timeslice;
     }
     
     $scope.currentSequence = {}
-    
+        
     $scope.openSequence = function(name, data) {
         
-        var editData = _.map(data, function(pitch) {
-            return _.map(pitch, function(playPitch) {            
+        var timeSlices = _.map(data, function(slice) {
+            var noteCells = _.map(slice, function(playPitch) {            
                 return {
-                    playPitch: playPitch,
+                    playPitch: playPitch
                 };
             });
+            return { 
+                noteCells: noteCells,
+                needsUpdate: false
+            };
         });
         
-        $scope.currentSequence.name = name;
-        $scope.currentSequence.editData = editData;
+        $scope.currentSequence = {
+            name: name,
+            timeSlices: timeSlices,
+            waveData: _.map(_.range(numChannels*numTimeSlices*samplesPerSlice),
+                            function(x){return 128;})
+        }
         
     }
     
     $scope.extractData = function() {
-        return _.map($scope.currentSequence.editData, function(pitch) {
-            return _.map(pitch, function(notecell) {
-                return notecell.playPitch;
+        return _.map($scope.currentSequence.timeSlices, function(timeSlice) {
+            return _.map(timeSlice.noteCells, function(noteCell) {
+                return noteCell.playPitch;
             });
         });
     }
     
     $scope.openSequence("Untitled", blankData);
-    function attack(x) {
-        return 1 - Math.pow((2 * x - 1),6);
+    
+    $scope.rebuildWaveData = function() {
+        
+        //console.log("Rebuilding sequence");
+        
+        for (var i = 0; i < numTimeSlices; i += 1) {
+            
+            var timeSlice = $scope.currentSequence.timeSlices[i];
+            
+            if (timeSlice.needsUpdate) {
+                
+                //console.log("Adding slice");
+                
+                var offset = numChannels * samplesPerSlice * i;
+                
+                for (var j = 0; j < numChannels * samplesPerSlice; j += 1) {
+                    
+                    $scope.currentSequence.waveData[offset+j] = 
+                        timeSlice.waveData[j];
+                    
+                }
+                
+                timeSlice.needsUpdate = false;
+                
+            }
+            
+        }
+        
     }
-    
-    var bpm = 120;
-    var sampleRate = 44056; // Hz
-    
-    var samplesPerSlice = sampleRate * 60 /* seconds per minute */ * (1/bpm) * (1/4)
-    
     
     var play = function() {
         
-        //alert("Playing sequence with " + samplesPerSlice + " samples per slice");
+        //console.log($scope.currentSequence.waveData.length);
         
-        var pitchData = []
-        
-        for (var pitch = 0; pitch < numPitches; pitch += 1) {
-            
-            var pitchMod = 50 * Math.pow(2,(pitch / 12))
-            
-            var data = [];
-            var totalSamples = samplesPerSlice * numTimeSlices;
-            for (var i = 0; i < totalSamples; i += 1) {
-                
-                var timeSlice = Math.floor(i / samplesPerSlice);
-                var notecell = ($scope.currentSequence.editData[pitch][timeSlice])
-                var onOffMultiplier = notecell.playPitch ? 1 : 0;
-                //var onOffMultiplier = 1;
-                
-                var attackMultiplier = attack((i / samplesPerSlice) % 1)
-                
-                data[2*i    ] = 128 + onOffMultiplier * attackMultiplier * Math.round(127*Math.sin(i/pitchMod));
-                data[2*i + 1] = 128 + onOffMultiplier * attackMultiplier * Math.round(127*Math.sin(i/pitchMod));
-            }
-            
-            pitchData[pitch] = data;
-            
-        }
-        
-        totalData = [];
-        
-        for (var i = 0; i < numChannels * totalSamples; i += 1) {
-            var sum = 0
-            var notesOn = 0
-            for (var pitch = 0; pitch < numPitches; pitch += 1) {
-                
-                var timeSlice = Math.floor(i / (2 * samplesPerSlice));
-                var notecell = ($scope.currentSequence.editData[pitch][timeSlice])
-                var onOffMultiplier = notecell.playPitch ? 1 : 0;
-                
-                if (notecell.playPitch) {
-                    var sample = pitchData[pitch][i]
-                    sum += sample;
-                    notesOn += 1;
-                }
-                
-            }
-            totalData[i] = (notesOn == 0) ? 128 : sum / notesOn;
-        }
+        console.log('making waves');
         
         var audio = new Audio();
         var wave = new RIFFWAVE();
         wave.header.sampleRate = sampleRate;
         wave.header.numChannels = numChannels;
-        wave.Make(totalData);
+        wave.Make($scope.currentSequence.waveData);
+        
+        console.log('Hitting Play');
+        
         audio.src = wave.dataURI;
         audio.play();
         
@@ -249,16 +240,104 @@ function LibrarySequence($scope) {
     
 }
 
+function TimeSlice($scope) {
+    
+    // $scope.timeSlice
+    // $scope.timeSlice.noteCells
+    
+    function attackCoeff(x) {
+        return 1 - Math.pow((2 * x - 1),6);
+    }
+    
+    $scope.timeSlice.waveData = [];
+    
+    $scope.rebuildSliceWaveData = function() {
+        
+        //console.log("Rebuilding slice");
+        
+        var cumulativeWaveData = _.map(_.range(samplesPerSlice),
+                                       function(x){return 0;});
+        
+        var pitchesPlayed = 0;
+        
+        for (var pitch = 0; pitch < numPitches; pitch += 1) {
+            
+            var pitchMod = 20 * Math.pow(2,(pitch / 12));
+            
+            var noteCell = $scope.timeSlice.noteCells[pitch];
+            
+            if (noteCell.playPitch) {
+                
+                //console.log("Adding pitch");
+                
+                for (var i = 0; i < samplesPerSlice; i += 1) {
+                    
+                    var sample = 127 
+                        * Math.sin(i/pitchMod) 
+                        * attackCoeff(i/samplesPerSlice);
+                    
+                    //console.log(sample);
+                    
+                    cumulativeWaveData[2*i  ] += sample;
+                    cumulativeWaveData[2*i+1] += sample;
+                    
+                }
+                
+                //console.log(cumulativeWaveData);
+                
+                pitchesPlayed += 1;
+                
+            }
+            
+        }
+        
+        if (pitchesPlayed > 0) {
+            
+            //console.log("Played " + pitchesPlayed);
+            
+            // Normalize by dividing by n, and taking the nth root,
+            // then add 128 to push the wave between 0 and 255
+            $scope.timeSlice.waveData = _.map(cumulativeWaveData, function(cumulativeSample) {
+                
+                var sample = 128 + cumulativeSample/pitchesPlayed;
+                //var sample = 128 + Math.pow(cumulativeSample/pitchesPlayed, 1/pitchesPlayed);
+                //console.log(cumulativeSample, sample);
+                return sample;
+            });
+            
+            //console.log($scope.timeSlice.waveData);
+            
+        } else {
+            
+            for (var i = 0; i < samplesPerSlice * numChannels; i += 1) {
+                $scope.timeSlice.waveData[i] = 128;
+            }
+            
+        }
+        
+        $scope.timeSlice.needsUpdate = true;
+        $scope.rebuildWaveData();
+        
+    }
+    
+    $scope.rebuildSliceWaveData();
+    
+}
+
 // Controller for an individual note cell
 function NoteCell($scope) {
-
+    
+    // $scope.noteCell
+    // $scope.noteCell.playPitch
+    
     $scope.setClass = function() {
-        $scope.playClass = $scope.notecell.playPitch ? 'play' : 'noPlay';
+        $scope.playClass = $scope.noteCell.playPitch ? 'play' : 'noPlay';
     }
     
     $scope.toggle = function() {
-        $scope.notecell.playPitch = !$scope.notecell.playPitch;
+        $scope.noteCell.playPitch = !$scope.noteCell.playPitch;
         $scope.setClass();
+        $scope.rebuildSliceWaveData()
     }
     
     $scope.setClass();
