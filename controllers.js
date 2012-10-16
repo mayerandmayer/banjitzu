@@ -226,6 +226,26 @@ function Editor($scope) {
     
     $scope.loadUserSequences($scope.viewingUser);
     
+    $scope.drawWave = function() {
+        //alert("Drawing...");
+        
+        var c = document.getElementById("waveForm");
+        var w = c.width;
+        var h = c.height;
+        var ctx = c.getContext("2d");
+        ctx.fillStyle="#000000";
+        
+        var total = numChannels * numTimeSlices * samplesPerSlice;
+        
+        //alert("Drawing " + total);
+        
+        for (var i = 0; i < total; i += 1) {
+            x = i / total * w;
+            y = $scope.currentSequence.waveData[i] / 256 * h;
+            ctx.fillRect(x,y,1,1);
+        }
+        
+    }
     
 }
 
@@ -246,7 +266,7 @@ function TimeSlice($scope) {
     // $scope.timeSlice.noteCells
     
     function attackCoeff(x) {
-        return 1 - Math.pow((2 * x - 1),6);
+        return 1 - Math.pow(((2 * x) - 1), 6);
     }
     
     $scope.timeSlice.waveData = [];
@@ -255,7 +275,7 @@ function TimeSlice($scope) {
         
         //console.log("Rebuilding slice");
         
-        var cumulativeWaveData = _.map(_.range(samplesPerSlice),
+        var cumulativeWaveData = _.map(_.range(samplesPerSlice*numChannels),
                                        function(x){return 0;});
         
         var pitchesPlayed = 0;
@@ -278,8 +298,8 @@ function TimeSlice($scope) {
                     
                     //console.log(sample);
                     
-                    cumulativeWaveData[2*i  ] += sample;
-                    cumulativeWaveData[2*i+1] += sample;
+                    cumulativeWaveData[2*i] += sample;
+                    //cumulativeWaveData[2*i+1] += sample;
                     
                 }
                 
